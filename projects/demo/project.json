@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "title": "Creative without compromise",
+  "format": "landscape",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "bpm": 120,
+  "beatsPerCut": 4,
+  "seed": 7,
+  "brand": { "name": "MOTIONFORGE", "palette": "aurora" },
+  "shots": [
+    {"eyebrow":"01 / THE HOOK","headline":"MAKE IDEAS MOVE.","caption":"Turn a rough idea into precise, distinctive motion graphics.","motif":"orbit"},
+    {"eyebrow":"02 / THE CRAFT","headline":"REAL PHYSICS. REAL FEEL.","caption":"Closed-form springs give every movement genuine mass and response.","motif":"cards"},
+    {"eyebrow":"03 / THE RHYTHM","headline":"SOUND BUILT FROM CODE.","caption":"A synthesised 48 kHz soundtrack follows the same exact beat grid.","motif":"wave"},
+    {"eyebrow":"04 / THE DELIVERY","headline":"RENDER. REVIEW. REFINE.","caption":"Audit every frame, critique every scene and improve with evidence.","motif":"type"}
+  ]
+}

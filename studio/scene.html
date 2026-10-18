@@ -1,0 +1,128 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>MotionForge · Project renderer</title></head>
+<body style="margin:0;overflow:hidden;background:#0a1020"><canvas id="frame" style="display:block"></canvas>
+<!-- ENGINE_SPRING_SOURCE -->
+<script>
+'use strict';
+// Responsive, deterministic Canvas scene. CSS is static only: no animations/easings.
+const canvas=document.getElementById('frame');
+const ctx=canvas.getContext('2d',{alpha:false});
+const {springState}=globalThis.SpringPhysics;
+const TWO_PI=Math.PI*2;
+const themes={
+ aurora:{bg:'#081420',bg2:'#113347',accent:'#A0F2D1',hot:'#FF9875',ink:'#F3FCF7',muted:'#A7BDBB'},
+ ember:{bg:'#1B1017',bg2:'#52302F',accent:'#FBE09B',hot:'#F58D80',ink:'#FFF7E7',muted:'#CAB8B1'},
+ violet:{bg:'#141126',bg2:'#43315B',accent:'#CDB9FF',hot:'#B7FF9E',ink:'#F8F1FF',muted:'#BBB3D4'},
+ mono:{bg:'#101318',bg2:'#26353A',accent:'#E3FBFC',hot:'#EAFB8E',ink:'#FAFFFF',muted:'#B7C2CA'}
+};
+const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+const spring=(from,to,t,{mass=1,stiffness=200,damping=22,velocity=0}={})=>springState({position:from,velocity,target:to,mass,stiffness,damping,elapsed:Math.max(0,t)}).position;
+const round=(x,y,w,h,r,fill)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();};
+const stroke=(x,y,a,b,color,weight=2)=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(a,b);ctx.strokeStyle=color;ctx.lineWidth=weight;ctx.stroke();};
+const circle=(x,y,r,fill)=>{ctx.beginPath();ctx.arc(x,y,Math.max(.1,r),0,TWO_PI);ctx.fillStyle=fill;ctx.fill();};
+const text=(s,x,y,size,col,weight=700,align='left')=>{ctx.font=`${weight} ${size}px system-ui,Arial,sans-serif`;ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.fillStyle=col;ctx.fillText(s,x,y);};
+function wrapped(value,maxWidth,size,maxLines=3){
+ ctx.font=`850 ${size}px system-ui,Arial,sans-serif`;
+ const words=String(value||'').replace(/\s+/g,' ').trim().split(' '),out=[];let line='';
+ for(const word of words){const next=line?`${line} ${word}`:word;
+   if(ctx.measureText(next).width>maxWidth && line){out.push(line);line=word;}else line=next;
+ }
+ if(line)out.push(line);
+ if(out.length>maxLines){out.length=maxLines;while(out[maxLines-1].length>1&&ctx.measureText(out[maxLines-1]+'…').width>maxWidth)out[maxLines-1]=out[maxLines-1].slice(0,-1);out[maxLines-1]+='…';}
+ return out;
+}
+function backdrop(W,H,p,frame,shot,seed){
+ const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,p.bg);g.addColorStop(1,p.bg2);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ const radial=ctx.createRadialGradient(W*.82,H*.22,30,W*.82,H*.22,W*.8);
+ radial.addColorStop(0,p.accent+'29');radial.addColorStop(1,p.accent+'00');ctx.fillStyle=radial;ctx.fillRect(0,0,W,H);
+ // Static deterministically seeded grain; no frame random flicker.
+ let x=(seed+shot*3599)>>>0;
+ for(let i=0;i<260;i++){x=(Math.imul(x,1664525)+1013904223)>>>0;const px=x%Math.ceil(W);x=(Math.imul(x,1664525)+1013904223)>>>0;const py=x%Math.ceil(H);circle(px,py,.8,'#FFFFFF0B');}
+}
+function orbit(cx,cy,r,t,p,pulse){
+ const angle=spring(-1.25,.20,t,{stiffness:150,damping:16});
+ const grow=spring(.62,1,t,{stiffness:240,damping:20});
+ ctx.save();ctx.translate(cx,cy);ctx.scale(grow+pulse*.007,grow+pulse*.007);ctx.rotate(angle);
+ ctx.lineWidth=4;ctx.strokeStyle=p.accent;ctx.beginPath();ctx.arc(0,0,r,0,TWO_PI*.82);ctx.stroke();
+ ctx.lineWidth=22;ctx.strokeStyle=p.hot;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,0,r,1.6,2.05);ctx.stroke();
+ circle(0,0,r*.72,p.accent);
+ circle(0,0,r*.42,p.bg2);
+ circle(0,0,r*.21,p.hot);
+ ctx.strokeStyle=p.ink+'54';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,r*1.15,0,TWO_PI);ctx.stroke();ctx.restore();
+}
+function tiles(cx,cy,r,t,p,pulse){
+ const names=['DESIGN','MOTION','RHYTHM'];
+ names.forEach((name,i)=>{
+  const delay=i*.08;const shift=spring(r*1.9,0,Math.max(0,t-delay),{stiffness:230,damping:23});
+  const tilt=spring(.18*(i-1),.035*(i-1),Math.max(0,t-delay),{stiffness:190,damping:20});
+  const y=cy+(i-1)*r*.6+pulse*27*(i===1?1:-.6);
+  ctx.save();ctx.translate(cx+shift,y);ctx.rotate(tilt);ctx.shadowColor='#00000055';ctx.shadowBlur=18;
+  round(-r*1.12,-r*.28,r*2.24,r*.51,18,i===1?p.hot:p.accent);ctx.shadowBlur=0;
+  text(name,-r*.89,r*.08,r*.24,p.bg,850);text('0'+(i+1),r*.91,r*.08,r*.14,p.bg,700,'right');ctx.restore();
+ });
+}
+function wave(cx,cy,r,t,p,pulse,phase){
+ round(cx-r*1.18,cy-r*.95,r*2.36,r*1.9,24,'#06131D99');
+ for(let j=0;j<8;j++)stroke(cx-r*.98,cy-r*.72+j*r*.21,cx+r*.98,cy-r*.72+j*r*.21,p.ink+'13',2);
+ ctx.beginPath();ctx.lineWidth=5;ctx.strokeStyle=p.accent;
+ for(let i=0;i<=270;i++){
+  const x=cx-r+i*r*2/270,am=(Math.sin(i/270*Math.PI)**.65);
+  const y=cy+Math.sin(i/270*TWO_PI*5+phase*TWO_PI)*(r*.26+pulse*r*.015)*am;
+  i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+ }ctx.stroke();
+ for(let i=0;i<15;i++){const v=.18+.64*Math.abs(Math.sin(i*.82+phase*TWO_PI));round(cx-r*.9+i*r*.126,cy+r*.62-v*r*.22,r*.07,v*r*.22,3,p.hot);}
+ text('PCM / 48 KHZ',cx-r*.95,cy-r*.77,r*.11,p.muted,700);
+}
+function typographic(cx,cy,r,t,p,pulse){
+ const x=spring(-r*1.8,0,t,{stiffness:190,damping:22});
+ ctx.save();ctx.translate(cx+x,cy+pulse*27);ctx.rotate(spring(-.2,.035,t,{stiffness:160,damping:19}));
+ round(-r,-r*.9,r*2,r*1.8,34,p.accent);
+ text('01',0,r*.16,r*.96,p.bg,900,'center');stroke(-r*.73,r*.4,r*.73,r*.4,p.bg+'88',3);
+ text('MAKE IT MOVE',0,r*.62,r*.145,p.bg,900,'center');ctx.restore();
+}
+function drawFrame({frame,fps,width,height,bpm,beatsPerCut,framesPerBeat,seed,project,tuning={}}){
+ if(!project||!Array.isArray(project.shots))throw Error('MotionForge requires --project with validated shots');
+ if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+ const W=1000,H=1000*height/width,vertical=H>950,cutEvery=framesPerBeat*beatsPerCut;
+ const cutIndex=Math.floor(frame/cutEvery),shot=project.shots[cutIndex];
+ if(!shot)throw Error(`Scene ${cutIndex} missing from project`);
+ const edit=tuning.shots?.[cutIndex]||{};
+ const t=(frame-cutIndex*cutEvery)/fps+.27+clamp(edit.preRoll||0,0,.4);
+ const beatIndex=Math.floor(frame/framesPerBeat),phase=(frame%framesPerBeat)/framesPerBeat;
+ const pulse=spring(0,0,(frame%framesPerBeat)/fps,{stiffness:150,damping:9,velocity:34})*clamp(edit.pulseGain??1,.7,2.1);
+ const keys=Object.keys(themes),key=keys[(keys.indexOf(project.brand.palette)+Math.trunc(clamp(edit.paletteShift||0,0,3)))%keys.length]||'aurora';
+ const p=themes[key];ctx.setTransform(width/W,0,0,width/W,0,0);backdrop(W,H,p,frame,cutIndex,seed);
+ const left=vertical?78:62,margin=vertical?78:62,blockWidth=vertical?W-156:W*.49;
+ // Safe opening staging: the text is readable by the first captured cut frame.
+ const entry=spring(-220,0,t,{stiffness:215,damping:25});
+ const artScale=clamp(edit.artScale??1,.85,1.13);
+ const typY=vertical?H*.17:H*.28,headlineSize=vertical?78:72;
+ text(shot.eyebrow.toUpperCase().slice(0,65),left+entry,typY-(vertical?91:54),vertical?25:18,p.hot,750);
+ const lines=wrapped(shot.headline,blockWidth,headlineSize,vertical?4:3);
+ lines.forEach((line,i)=>text(line,left+entry,typY+i*headlineSize*1.13,headlineSize,p.ink,900));
+ const captionY=typY+Math.max(lines.length,1)*headlineSize*1.13+39;
+ ctx.font=`500 ${vertical?33:22}px system-ui,Arial,sans-serif`;
+ const capWords=shot.caption.split(/\s+/);let capLine='',caps=[];
+ for(const word of capWords){const test=capLine?`${capLine} ${word}`:word;if(ctx.measureText(test).width>blockWidth&&capLine){caps.push(capLine);capLine=word;}else capLine=test;}
+ if(capLine)caps.push(capLine);
+ caps.slice(0,vertical?3:2).forEach((line,i)=>text(line,left+entry,captionY+i*(vertical?44:31),vertical?33:22,p.muted,500));
+ const artX=vertical?W*.5:W*.785,artY=vertical?H*.69:H*.54;
+ const r=(vertical?W*.275:Math.min(W*.19,H*.31))*artScale;
+ const drift=spring(r*.8,0,t,{stiffness:170,damping:19});
+ ctx.save();ctx.translate(clamp(edit.offsetX||0,-75,75),0);
+ if(shot.motif==='cards')tiles(artX+drift,artY,r,t,p,pulse);
+ else if(shot.motif==='wave')wave(artX+drift,artY,r,t,p,pulse,phase);
+ else if(shot.motif==='type')typographic(artX+drift,artY,r,t,p,pulse);
+ else orbit(artX+drift,artY,r,t,p,pulse);
+ ctx.restore();
+ // Brand-safe HUD, progress and beat display (static drawing only).
+ round(left,48,18,18,4,p.hot);text(project.brand.name,left+32,65,vertical?20:17,p.ink,800);
+ text(`${String(cutIndex+1).padStart(2,'0')} / ${String(project.shots.length).padStart(2,'0')}`,W-margin,65,vertical?20:17,p.accent,750,'right');
+ const bottom=H-(vertical?82:42),barW=W-left-margin;
+ stroke(left,bottom-19,W-margin,bottom-19,p.ink+'3B',2);
+ for(let i=0;i<project.shots.length;i++)round(left+i*barW/project.shots.length,bottom-13,Math.max(1,barW/project.shots.length-5),8,3,i<=cutIndex?p.hot:p.ink+'29');
+ text(`${bpm} BPM · ${fps} FPS · FRAME-LOCKED`,left,bottom+31,vertical?18:15,p.muted,700);
+ ctx.setTransform(1,0,0,1,0,0);
+ return {frame,beatIndex,cutIndex,shot:shot.motif,phase};
+}
+window.renderFrame=drawFrame;
+</script></body></html>

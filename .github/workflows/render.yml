@@ -1,0 +1,54 @@
+name: Render demo video (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      vision:
+        description: 'Use paid OpenAI visual critique? Requires OPENAI_API_KEY repository secret.'
+        type: boolean
+        default: false
+      max_passes:
+        description: 'Maximum independent renders (1-3)'
+        type: choice
+        options: ['1', '2', '3']
+        default: '2'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify dependencies
+        run: |
+          command -v ffmpeg
+          command -v google-chrome || command -v chromium || command -v chromium-browser
+      - name: Unit tests
+        run: npm test
+      - name: Render, inspect and revise
+        env:
+          ENABLE_VISION: ${{ inputs.vision }}
+          MAX_PASSES: ${{ inputs.max_passes }}
+        run: |
+          ARGS=()
+          if [ "$ENABLE_VISION" = 'true' ]; then
+            test -n "$OPENAI_API_KEY" || { echo 'Missing OPENAI_API_KEY GitHub secret'; exit 1; }
+            ARGS+=(--vision)
+          fi
+          node studio.mjs produce projects/demo/project.json --preview --max-passes "$MAX_PASSES" --out exports/demo-polished.mp4 --work exports/qa "${ARGS[@]}"
+      - name: Upload video and QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motionforge-demo-and-review
+          path: |
+            exports/*.mp4
+            exports/qa/review-report.json
+            exports/qa/pass-*-scene-*.png
+          if-no-files-found: warn
+          retention-days: 7

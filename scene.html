@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Physical Motion • Sound Driven</title></head>
+<body style="margin:0;overflow:hidden;background:#0b1017">
+<canvas id="scene" style="display:block"></canvas>
+<!-- ENGINE_SPRING_SOURCE -->
+<script>
+'use strict';
+// All animated element positions, rotations and elastic scales are analytical
+// damped-spring solutions from physics.cjs. NO CSS transitions or keyframes.
+const canvas=document.getElementById('scene');
+const ctx=canvas.getContext('2d',{alpha:false});
+const {springState}=globalThis.SpringPhysics;
+const TAU=2*Math.PI;
+const SW=1280, SH=720;
+const PALETTES=[
+  {bg:'#090e15',deep:'#172735',primary:'#b9f5e0',accent:'#fe845a',ink:'#e8f1e9'},
+  {bg:'#151021',deep:'#35263b',primary:'#c5acff',accent:'#cfff85',ink:'#f4efff'},
+  {bg:'#071a22',deep:'#144453',primary:'#64f0eb',accent:'#ffbb8c',ink:'#ecffff'},
+  {bg:'#24100e',deep:'#573426',primary:'#ffe49d',accent:'#ffa796',ink:'#fff4df'},
+];
+const damp=(from,to,t,opts={})=>springState({position:from,velocity:opts.velocity||0,target:to,
+  mass:opts.mass||1,stiffness:opts.stiffness||210,damping:opts.damping??22,elapsed:Math.max(0,t)}).position;
+const impulse=(t,v=1,opts={})=>springState({position:0,velocity:v,target:0,
+  stiffness:opts.stiffness||310,damping:opts.damping??19,elapsed:Math.max(0,t)}).position;
+const bar=(x,y,w,h,r,fill)=>{ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();};
+const line=(x,y,xx,yy,color,width=1)=>{ctx.strokeStyle=color;ctx.lineWidth=width;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();};
+const circle=(x,y,r,fill)=>{ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,Math.max(.01,r),0,TAU);ctx.fill();};
+const txt=(value,x,y,size,colour,weight=700,align='left')=>{
+  ctx.fillStyle=colour;ctx.font=`${weight} ${size}px system-ui,Arial,sans-serif`;
+  ctx.textAlign=align;ctx.fillText(value,x,y);
+};
+function grain(seed,shot){
+  let x=(seed+shot*9176)>>>0;
+  for(let i=0;i<105;i++){
+    x=(Math.imul(x,1664525)+1013904223)>>>0;
+    const px=x%1280; x=(Math.imul(x,1664525)+1013904223)>>>0;
+    const py=x%720;
+    circle(px,py,1+(x%3)*.35,'rgba(255,255,255,0.055)');
+  }
+}
+function bg(p,seed,shot){
+  const g=ctx.createLinearGradient(0,0,1280,720);
+  g.addColorStop(0,p.bg);g.addColorStop(1,p.deep);ctx.fillStyle=g;ctx.fillRect(0,0,1280,720);
+  const glow=ctx.createRadialGradient(1000,120,20,1000,120,710);
+  glow.addColorStop(0,p.primary+'25');glow.addColorStop(1,p.primary+'00');
+  ctx.fillStyle=glow;ctx.fillRect(0,0,1280,720);
+  grain(seed,shot);
+}
+function metalRing(x,y,r,p,rotation){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rotation);
+  ctx.strokeStyle=p.primary;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r,.1,Math.PI*1.56);ctx.stroke();
+  ctx.strokeStyle=p.accent;ctx.lineWidth=16;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,0,r,Math.PI*1.64,Math.PI*1.92);ctx.stroke();
+  ctx.globalAlpha=.3;ctx.strokeStyle=p.ink;ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,r+25,0,TAU);ctx.stroke();
+  ctx.restore();
+}
+function shot0(t,p,beatPulse){
+  // Rigid objects acquire actual spring displacement/velocity, not eased CSS.
+  const xo=damp(1270,910,t,{stiffness:145,damping:16});
+  const scale=damp(0.66,1,t,{stiffness:230,damping:17});
+  const rot=damp(-1.1,.16,t,{stiffness:130,damping:13});
+  ctx.save();ctx.translate(xo,345);ctx.scale(scale+beatPulse*.024,scale+beatPulse*.024);
+  metalRing(0,0,204,p,rot);
+  const grad=ctx.createRadialGradient(-65,-78,4,0,0,165);
+  grad.addColorStop(0,'#ffffff');grad.addColorStop(.25,p.primary);grad.addColorStop(1,'#366c72');
+  circle(0,0,150,grad);
+  ctx.save();ctx.rotate(rot);bar(-42,-164,84,328,42,p.accent);ctx.restore();
+  circle(0,0,55,p.bg);circle(0,0,17,p.primary);ctx.restore();
+  const left=damp(-470,87,t,{stiffness:180,damping:21});
+  txt('PHYSICS',left,265,108,p.ink,850);
+  txt('IN MOTION.',left,377,102,p.primary,850);
+  bar(left+3,409,365,4,2,p.accent);
+  txt('A FRAME-BY-FRAME RENDER ENGINE',left+3,452,18,p.ink,500);
+  txt('NO INTERPOLATION SHORTCUTS.',left+3,485,17,p.primary,600);
+}
+function cardTile(x,y,w,h,colour,textA,textB,t,delay,angle=0){
+  const enter=Math.max(0,t-delay);
+  const off=damp(290,0,enter,{stiffness:235,damping:17});
+  const tilt=damp(angle*3,angle,enter,{stiffness:165,damping:14});
+  ctx.save();ctx.translate(x+off,y);ctx.rotate(tilt);
+  ctx.shadowColor='#00000088';ctx.shadowBlur=30;ctx.shadowOffsetY=12;
+  bar(-w/2,-h/2,w,h,26,colour);ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+  txt(textA,-w/2+30,2,31,'#18131f',800);
+  txt(textB,-w/2+30,39,15,'#30233c',650);
+  ctx.restore();
+}
+function shot1(t,p,beatPulse){
+  const tx=damp(-475,95,t,{stiffness:173,damping:19});
+  txt('TRUE',tx,231,109,p.ink,900);txt('SPRINGS.',tx,345,110,p.primary,900);
+  txt('m·x″ + c·x′ + k(x − target) = 0',tx+6,407,26,p.accent,650);
+  txt('CLOSED-FORM SOLUTIONS',tx+6,446,18,p.ink,500);
+  // Three separate damped mechanical responses, with staggered impulses.
+  ctx.save();ctx.translate(0,beatPulse*8);
+  cardTile(913,205,416,136,'#c5acff','01 / MASS','INERTIA',t,0.05,-.16);
+  cardTile(888,358,432,136,'#cfff85','02 / SPRING','STIFFNESS',t,.16,.11);
+  cardTile(917,515,424,136,'#ffad91','03 / DAMPING','ENERGY LOSS',t,.29,-.08);
+  ctx.restore();
+}
+function shot2(t,p,beatPulse,beatPhase,beatIndex){
+  const tx=damp(-505,88,t,{stiffness:182,damping:21});
+  txt('SOUND',tx,225,113,p.ink,900);txt('FROM CODE.',tx,343,86,p.primary,900);
+  txt('PCM SYNTHESIS  /  48 kHz',tx+5,417,21,p.accent,700);
+  txt('NO SAMPLE PACKS. NO AUDIO ASSETS.',tx+5,452,17,p.ink,500);
+  const panelX=damp(1360,955,t,{stiffness:180,damping:17});
+  ctx.save();ctx.translate(panelX,359);
+  bar(-286,-232,558,460,42,'#e4f4ed');
+  bar(-256,-197,498,364,25,'#092633');
+  for(let j=0;j<10;j++)line(-232,-150+j*33,222,-150+j*33,'#ffffff10',1);
+  // Scope responds to the beat via an analytic spring impulse, plus oscillation
+  // that depicts the synthesised audio waveform (not positional CSS animation).
+  const amplitude=18+beatPulse*150;
+  ctx.beginPath();ctx.lineWidth=4;ctx.strokeStyle=p.primary;
+  for(let i=0;i<=420;i++){
+    const x=-215+i;const phase=(i/420)*TAU*6;
+    const env=Math.pow(Math.max(0,1-Math.abs(i-210)/225),.6);
+    const y=15+Math.sin(phase+beatPhase*TAU)*amplitude*env*.7+
+       Math.sin(phase*2.8+beatPhase*TAU*2)*amplitude*.13*env;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  }ctx.stroke();
+  for(let i=0;i<16;i++){
+    const h=25+Math.abs(Math.sin(i*1.7+beatIndex*.75))*(50+beatPulse*80);
+    bar(-229+i*29,144-h,15,h,5,i%3===0?p.accent:p.primary);
+  }
+  txt('BEAT  '+String(beatIndex+1).padStart(2,'0'),-214,-155,16,'#93b9ba',700);
+  ctx.restore();
+}
+function shot3(t,p,beatPulse,beatIndex,beatPhase,bpm){
+  const tx=damp(-480,91,t,{stiffness:184,damping:21});
+  txt('EVERY CUT',tx,205,89,p.ink,900);
+  txt('ON THE',tx,316,91,p.ink,900);
+  txt('BEAT.',tx,434,129,p.accent,900);
+  const num=damp(1340,923,t,{stiffness:168,damping:18});
+  ctx.save();ctx.translate(num,335);ctx.scale(1+beatPulse*.024,1+beatPulse*.024);
+  circle(0,0,210,p.primary);
+  txt(String(bpm),0,8,142,p.bg,900,'center');
+  txt('BPM   /   FRAME LOCKED',0,62,20,p.bg,750,'center');
+  ctx.restore();
+  txt('AUDIO SAMPLE ⇆ VIDEO FRAME',95,522,18,p.primary,600);
+  for(let i=0;i<16;i++){
+    const x=95+i*36;
+    bar(x,561,28,46,6,i <= (beatIndex%16)?p.accent:'#ffffff28');
+  }
+  txt('INTEGER TIMELINE  •  ZERO BEAT DRIFT',95,550,17,p.ink,550);
+}
+function hud(p,frame,fps,beatIndex,framesPerBeat,cutIndex,beatsPerCut,duration){
+  bar(40,32,29,29,7,p.accent);
+  txt('PHYSICAL / STUDIO',85,55,20,p.ink,800);
+  txt('VOL. 01  /  MOTION SYSTEM',1240,55,16,p.primary,650,'right');
+  const y=670;
+  line(41,y,1239,y,'#ffffff35',2);
+  const beats=Math.ceil(duration*fps/framesPerBeat);
+  for(let i=0;i<beats;i++){
+    const x=41+i*(1198/Math.max(1,beats));
+    const on=i<=beatIndex;
+    bar(x,y-5,Math.max(3,(1198/beats)-4),10,2,on?p.accent:'#ffffff25');
+  }
+  txt(`CUT ${String(cutIndex+1).padStart(2,'0')}`,42,638,16,p.ink,800);
+  txt(`BEAT ${String(beatIndex+1).padStart(2,'0')}   /   ${fps} FPS`,1238,638,16,p.primary,700,'right');
+}
+window.renderFrame=({frame,fps,width,height,duration,seed=7,bpm=120,beatsPerCut=4,framesPerBeat,tuning={}})=>{
+  if(!Number.isInteger(framesPerBeat)||framesPerBeat<=0)throw Error('framesPerBeat required');
+  if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+  const beatIndex=Math.floor(frame/framesPerBeat);
+  const cutIndex=Math.floor(beatIndex/beatsPerCut);
+  const cutFrame=cutIndex*beatsPerCut*framesPerBeat;
+  // All edits preserve the actual spring differential equation: advancing its
+  // initial-condition clock is not CSS interpolation or synthetic easing.
+  const edit=tuning?.shots?.[cutIndex] || {};
+  const bound=(n,lo,hi,def)=>Number.isFinite(n)?Math.max(lo,Math.min(hi,n)):def;
+  const sectionTime=(frame-cutFrame)/fps+bound(edit.preRoll,0,.4,0);
+  const beatPhase=(frame%framesPerBeat)/framesPerBeat;
+  const beatElapsed=(frame%framesPerBeat)/fps;
+  // Spring response to a perfectly sample-aligned impulse at EVERY beat.
+  const beatPulse=impulse(beatElapsed,21,{stiffness:365,damping:22})*bound(edit.pulseGain,.7,2.1,1);
+  const p=PALETTES[(cutIndex+Math.trunc(bound(edit.paletteShift,0,3,0)))%4];
+  ctx.save();
+  const sx=Math.min(width/SW,height/SH);
+  ctx.fillStyle=p.bg;ctx.fillRect(0,0,width,height);
+  ctx.setTransform(sx,0,0,sx,(width-SW*sx)/2,(height-SH*sx)/2);
+  bg(p,seed,cutIndex);
+  const shot=cutIndex%4;
+  // Artwork is scaled around the design centre; persistent HUD stays anchored.
+  const artScale=bound(edit.artScale,.85,1.13,1);
+  const offsetX=bound(edit.offsetX,-75,75,0);
+  ctx.save();ctx.translate(SW/2+offsetX,SH/2);ctx.scale(artScale,artScale);ctx.translate(-SW/2,-SH/2);
+  if(shot===0)shot0(sectionTime,p,beatPulse);
+  else if(shot===1)shot1(sectionTime,p,beatPulse);
+  else if(shot===2)shot2(sectionTime,p,beatPulse,beatPhase,beatIndex);
+  else shot3(sectionTime,p,beatPulse,beatIndex,beatPhase,bpm);
+  ctx.restore();
+  hud(p,frame,fps,beatIndex,framesPerBeat,cutIndex,beatsPerCut,duration);
+  ctx.restore();
+  return {frame,beatIndex,cutIndex,cutFrame,shot,beatPhase};
+};
+</script>
+</body></html>

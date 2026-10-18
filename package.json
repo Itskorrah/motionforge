@@ -1,0 +1,16 @@
+{
+  "name": "motionforge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic motion graphics studio: creative brief to beat-locked spring animation, synthesised audio and self-review",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "presets": "node studio.mjs presets",
+    "plan": "node studio.mjs plan projects/demo/project.json",
+    "demo": "node studio.mjs render projects/demo/project.json --preview --out exports/demo.mp4",
+    "produce": "node studio.mjs produce projects/demo/project.json --preview --out exports/polished.mp4",
+    "legacy-demo": "node render.mjs --fps 30 --bpm 120 --beats-per-cut 4 --seconds 8 --out exports/legacy-demo.mp4"
+  }
+}
