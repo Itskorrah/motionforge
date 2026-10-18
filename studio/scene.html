@@ -79,6 +79,33 @@ function typographic(cx,cy,r,t,p,pulse){
  text('01',0,r*.16,r*.96,p.bg,900,'center');stroke(-r*.73,r*.4,r*.73,r*.4,p.bg+'88',3);
  text('MAKE IT MOVE',0,r*.62,r*.145,p.bg,900,'center');ctx.restore();
 }
+function prism(cx,cy,r,t,p,pulse){
+ const scale=spring(.48,1,t,{stiffness:205,damping:20});
+ ctx.save();ctx.translate(cx,cy);ctx.rotate(spring(-.4,.12,t,{stiffness:165,damping:18})+pulse*.065);ctx.scale(scale*(1+pulse*.012),scale*(1+pulse*.012));
+ for(let k=4;k>=0;k--){
+   const size=r*(1.05-k*.15),off=k*r*.145+pulse*(k-2)*3;
+   ctx.beginPath();ctx.moveTo(-size+off,-size*.64-off);ctx.lineTo(size+off,-size*.64-off);
+   ctx.lineTo(size*.7+off,size*.8-off);ctx.lineTo(-size*.82+off,size*.8-off);ctx.closePath();
+   ctx.fillStyle=k%2?p.bg2:p.accent;ctx.fill();ctx.strokeStyle=k%2?p.hot:p.ink;ctx.lineWidth=3;ctx.stroke();
+ }
+ circle(r*.23,-r*.16,r*.095+pulse*4,p.hot);ctx.restore();
+}
+function constellation(cx,cy,r,t,p,pulse){
+ const points=[[-.77,-.52],[-.2,-.86],[.58,-.66],[.82,.03],[.34,.71],[-.53,.58],[.05,-.06]];
+ const reveal=clamp(spring(0,1,t,{stiffness:160,damping:18}),0,1);
+ ctx.save();ctx.translate(cx,cy);ctx.rotate(spring(-.24,.025,t,{stiffness:150,damping:19}));
+ for(let i=0;i<points.length;i++){
+   const a=points[i],b=points[(i+1)%points.length];
+   stroke(a[0]*r,a[1]*r,b[0]*r,b[1]*r,p.accent+'94',2.5);
+   stroke(a[0]*r,a[1]*r,points[6][0]*r,points[6][1]*r,p.ink+'36',1);
+ }
+ points.forEach((pt,i)=>{
+   const grow=clamp(spring(0,1,Math.max(0,t-i*.055),{stiffness:240,damping:21}),0,1);
+   circle(pt[0]*r,pt[1]*r,(i===6?17:8)*grow*reveal+(i===6?pulse*3:0),i===6?p.hot:p.accent);
+   if(i!==6){ctx.beginPath();ctx.arc(pt[0]*r,pt[1]*r,18,0,TWO_PI);ctx.strokeStyle=p.accent+'50';ctx.lineWidth=2;ctx.stroke();}
+ });
+ ctx.restore();
+}
 function drawFrame({frame,fps,width,height,bpm,beatsPerCut,framesPerBeat,seed,project,tuning={}}){
  if(!project||!Array.isArray(project.shots))throw Error('MotionForge requires --project with validated shots');
  if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
@@ -91,27 +118,32 @@ function drawFrame({frame,fps,width,height,bpm,beatsPerCut,framesPerBeat,seed,pr
  const pulse=spring(0,0,(frame%framesPerBeat)/fps,{stiffness:150,damping:9,velocity:34})*clamp(edit.pulseGain??1,.7,2.1);
  const keys=Object.keys(themes),key=keys[(keys.indexOf(project.brand.palette)+Math.trunc(clamp(edit.paletteShift||0,0,3)))%keys.length]||'aurora';
  const p=themes[key];ctx.setTransform(width/W,0,0,width/W,0,0);backdrop(W,H,p,frame,cutIndex,seed);
- const left=vertical?78:62,margin=vertical?78:62,blockWidth=vertical?W-156:W*.49;
+ const layout=shot.layout||'split',artLed=layout==='art-led',typeLed=layout==='type-led';
+ const left=vertical?78:62,margin=vertical?78:62;
+ const blockWidth=vertical?W-156:artLed?W*.78:typeLed?W*.61:W*.49;
  // Safe opening staging: the text is readable by the first captured cut frame.
  const entry=spring(-220,0,t,{stiffness:215,damping:25});
  const artScale=clamp(edit.artScale??1,.85,1.13);
- const typY=vertical?H*.17:H*.28,headlineSize=vertical?78:72;
+ const typY=artLed?(vertical?H*.76:H*.68):typeLed?(vertical?H*.21:H*.32):(vertical?H*.17:H*.28);
+ const headlineSize=artLed?(vertical?68:43):typeLed?(vertical?83:79):(vertical?78:72);
  text(shot.eyebrow.toUpperCase().slice(0,65),left+entry,typY-(vertical?91:54),vertical?25:18,p.hot,750);
- const lines=wrapped(shot.headline,blockWidth,headlineSize,vertical?4:3);
+ const lines=wrapped(shot.headline,blockWidth,headlineSize,artLed?2:vertical?4:3);
  lines.forEach((line,i)=>text(line,left+entry,typY+i*headlineSize*1.13,headlineSize,p.ink,900));
- const captionY=typY+Math.max(lines.length,1)*headlineSize*1.13+39;
+ const captionY=typY+Math.max(lines.length,1)*headlineSize*1.13+(artLed?14:39);
  ctx.font=`500 ${vertical?33:22}px system-ui,Arial,sans-serif`;
  const capWords=shot.caption.split(/\s+/);let capLine='',caps=[];
  for(const word of capWords){const test=capLine?`${capLine} ${word}`:word;if(ctx.measureText(test).width>blockWidth&&capLine){caps.push(capLine);capLine=word;}else capLine=test;}
  if(capLine)caps.push(capLine);
- caps.slice(0,vertical?3:2).forEach((line,i)=>text(line,left+entry,captionY+i*(vertical?44:31),vertical?33:22,p.muted,500));
- const artX=vertical?W*.5:W*.785,artY=vertical?H*.69:H*.54;
- const r=(vertical?W*.275:Math.min(W*.19,H*.31))*artScale;
+ caps.slice(0,artLed?(vertical?2:1):vertical?3:2).forEach((line,i)=>text(line,left+entry,captionY+i*(vertical?44:31),artLed?(vertical?28:19):vertical?33:22,p.muted,500));
+ const artX=artLed?W*.5:vertical?W*.5:typeLed?W*.84:W*.785,artY=artLed?(vertical?H*.46:H*.33):vertical?H*.69:H*.54;
+ const r=(artLed?(vertical?W*.26:Math.min(W*.17,H*.27)):(vertical?W*.275:Math.min(W*.19,H*.31)))*artScale;
  const drift=spring(r*.8,0,t,{stiffness:170,damping:19});
- ctx.save();ctx.translate(clamp(edit.offsetX||0,-75,75),0);
+ ctx.save();ctx.translate(clamp(edit.offsetX||0,-75,75),0);if(typeLed)ctx.globalAlpha=.75;
  if(shot.motif==='cards')tiles(artX+drift,artY,r,t,p,pulse);
  else if(shot.motif==='wave')wave(artX+drift,artY,r,t,p,pulse,phase);
  else if(shot.motif==='type')typographic(artX+drift,artY,r,t,p,pulse);
+ else if(shot.motif==='prism')prism(artX+drift,artY,r,t,p,pulse);
+ else if(shot.motif==='constellation')constellation(artX+drift,artY,r,t,p,pulse);
  else orbit(artX+drift,artY,r,t,p,pulse);
  ctx.restore();
  // Brand-safe HUD, progress and beat display (static drawing only).
