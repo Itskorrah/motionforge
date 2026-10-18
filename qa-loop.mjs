@@ -10,10 +10,12 @@ import { analyseFrames, selectSamples, contactSheet } from './quality.mjs';
 import { critiqueScene, improveTuning } from './critic.mjs';
 import { createTimeline } from './timeline.mjs';
 import { loadProject } from './studio/project.mjs';
+import {providerConfig} from './studio/providers.mjs';
 const renderer=fileURLToPath(new URL('./render.mjs',import.meta.url));
 const usage=`Usage: node qa-loop.mjs [--out final.mp4] [--work qa-work] [--max-passes 3]
-  --vision             Require real OpenAI image review (needs OPENAI_API_KEY)
-  --model MODEL        Vision model (default: gpt-4.1-mini)
+  --vision             Require real provider image review (needs provider API key)
+  --provider NAME      openai | claude | gemini | grok (default: openai)
+  --model MODEL        Vision model (provider-specific default)
   --project PATH       MotionForge production spec (must exactly match timeline)
   --scene PATH         Custom HTML Canvas scene (must accept tuning for auto repairs)
   --min-score N        Minimum score for every scene (default: 8)
@@ -24,13 +26,13 @@ const usage=`Usage: node qa-loop.mjs [--out final.mp4] [--work qa-work] [--max-p
 No API key? The loop performs technical dead-frame QA, creates contact sheets and
 can repair defects, but reports artistic quality as UNVERIFIED — never fake 8/10.
 Example:
-  OPENAI_API_KEY=... node qa-loop.mjs --vision --max-passes 3 --out polished.mp4
+  ANTHROPIC_API_KEY=... node qa-loop.mjs --vision --provider claude --max-passes 3 --out polished.mp4
 `;
 function opts(argv){
- const a={out:'polished.mp4',work:'quality-review',maxPasses:3,model:'gpt-4.1-mini',minScore:8,
+ const a={out:'polished.mp4',work:'quality-review',maxPasses:3,provider:'openai',model:null,minScore:8,
   width:1280,height:720,fps:30,seconds:8,bpm:120,beatsPerCut:4,seed:7,vision:false,
   keepAttemptFrames:false,noSandbox:false};
- const names={'--out':'out','--work':'work','--max-passes':'maxPasses','--model':'model',
+ const names={'--out':'out','--work':'work','--max-passes':'maxPasses','--model':'model','--provider':'provider',
   '--min-score':'minScore','--scene':'scene','--project':'project','--width':'width','--height':'height','--fps':'fps','--seconds':'seconds',
   '--bpm':'bpm','--beats-per-cut':'beatsPerCut','--seed':'seed','--chrome':'chrome','--ffmpeg':'ffmpeg'};
  const numbers=new Set(['maxPasses','minScore','width','height','fps','seconds','bpm','beatsPerCut','seed']);
@@ -50,7 +52,7 @@ function opts(argv){
  const frames=Math.round(a.seconds*a.fps);
  a.timeline=createTimeline({...a,frames});a.frames=frames;
  a.out=resolve(a.out);a.work=resolve(a.work);
- if(a.vision&&!process.env.OPENAI_API_KEY)throw Error('Vision critique needs OPENAI_API_KEY. Without it omit --vision for technical checks only.');
+ if(a.vision){const cfg=providerConfig(a.provider,a.model);if(!cfg.apiKey)throw Error(`Vision critique needs ${cfg.envName}. Without it omit --vision for technical checks only.`);}
  return a;
 }
 function child(args){return new Promise((ok,no)=>{
@@ -85,7 +87,7 @@ async function main(){
    await contactSheet({ffmpeg:a.ffmpeg||'ffmpeg',framesDir:folder,output:sheet,frames:sampled,aspect:a.width<a.height?'vertical':a.width===a.height?'square':'landscape'});
    let visual=null;
    if(a.vision){
-    visual=await critiqueScene({image:sheet,model:a.model,scene:scene.scene,metrics:scene});
+    visual=await critiqueScene({image:sheet,provider:a.provider,model:a.model,scene:scene.scene,metrics:scene});
    }
    const passed=scene.technicalScore>=a.minScore && (!a.vision || visual.score>=a.minScore);
    scenes.push({scene:scene.scene,samples:sampled,storyboard:sheet,technical:scene,visual,passed});
@@ -117,7 +119,7 @@ async function main(){
  }
  await copyFile(best.mp4,a.out);
  const report={status:best.passed?(a.vision?'vision_approved':'technical_pass_vision_unverified'):'threshold_not_met',
-  artisticQualityVerified:a.vision&&best.passed,output:a.out,minimumRequired:a.minScore,
+  artisticQualityVerified:a.vision&&best.passed,visionProvider:a.vision?a.provider:null,visionModel:a.vision?providerConfig(a.provider,a.model).model:null,output:a.out,minimumRequired:a.minScore,
   bestPass:best.pass,bestTechnicalScore:best.technicalMinimum,bestVisionScore:best.visionMinimum,
   note:a.vision?'Vision scores are subjective model judgements, not proof of human preference.':
     'Vision API was not used. The numbers are only deterministic technical proxy scores; never claim a visual 8/10.',

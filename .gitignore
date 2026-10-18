@@ -3,8 +3,10 @@ node_modules/
 .env.*
 !.env.example
 .evolve/
-.agents/skills/
-.claude/skills/
+.agents/skills/*
+!.agents/skills/motionforge/
+.claude/skills/*
+!.claude/skills/motionforge/
 exports/
 *-frames/
 *-review/

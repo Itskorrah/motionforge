@@ -1,6 +1,6 @@
 # MotionForge
 
-**A local-first, code-first motion graphics studio** — plan a video once, compose dynamic Canvas scenes with physically modelled springs, synthesise a sample-aligned soundtrack, capture each exact frame in headless Chrome, export H.264/AAC with FFmpeg, and inspect the result for visual defects. An optional multimodal AI critic can score each shot and trigger bounded re-renders.
+**A local-first, code-first motion graphics studio** — plan a video once, compose dynamic Canvas scenes with physically modelled springs, synthesise a sample-aligned soundtrack, capture each exact frame in headless Chrome, export H.264/AAC with FFmpeg, and inspect the result for visual defects. Optional OpenAI, Claude, Gemini or Grok multimodal critics can score each shot and trigger bounded re-renders.
 
 **Status: functional v0.1 foundation, not a turnkey After Effects replacement.** The working UI is a CLI and editable JSON briefs. An interactive timeline editor, licensed asset ingestion, voiceover, captions, remote rendering, and unlimited autonomous production remain future work. Quality scores are subjective when an AI vision critic is used; local technical scores do not certify aesthetic excellence.
 
@@ -32,22 +32,26 @@ node studio.mjs produce projects/design/project.json --max-passes 3 --out export
 
 `init` without `--ai` creates a **deterministic first draft** by breaking up your prompt; it is not an intelligent creative director. Edit the brief to make the creative compelling. The production command re-renders only while the technical quality gate needs work and bounded changes are available. A failed technical gate exits non-zero even if the best MP4 has been saved.
 
-For AI script/storyboard generation and **true multimodal visual review**:
+For optional AI storyboarding and **true multimodal visual review** across OpenAI, Claude, Gemini and Grok:
 
 ```bash
-# Configure OPENAI_API_KEY in your environment; never commit it.
-node studio.mjs init --title "New concept" --prompt "..." --shots 4 --ai --out projects/concept/project.json
-node studio.mjs produce projects/concept/project.json --vision --min-score 8 \
-  --max-passes 3 --out exports/concept.mp4
+# Set ANTHROPIC_API_KEY in your environment (or use another provider key).
+node studio.mjs providers
+node studio.mjs init --title "New concept" --prompt "..." --shots 4 \
+  --ai --provider claude --out projects/concept/project.json
+# Critique with Gemini instead; requires GEMINI_API_KEY.
+node studio.mjs produce projects/concept/project.json --vision --critic-provider gemini \
+  --min-score 8 --max-passes 3 --out exports/concept.mp4
 ```
 
-AI calls use the OpenAI API, not ChatGPT subscription usage; they are optional and billed separately. No API key means **artistic quality is unverified**, not 8/10. Changes from the vision critic are limited to a safe tuning schema. The program never executes model-generated patches.
+AI calls use the selected provider’s developer API, not consumer ChatGPT/Claude/Gemini/Grok or coding-agent subscription usage; they are optional and billed separately. See [docs/PROVIDERS.md](docs/PROVIDERS.md). No API key means **artistic quality is unverified**, not 8/10. Changes from the vision critic are limited to a safe tuning schema. The program never executes model-generated patches.
 
 ## Studio commands
 
 | Command | What it does |
 |---|---|
 | `node studio.mjs presets` | Show supported formats, palettes, motifs |
+| `node studio.mjs providers` | Show available providers, default models and whether the environment has a key |
 | `node studio.mjs init ...` | Create a validated new project from a brief; optional `--ai` |
 | `node studio.mjs plan PATH` | Display shot count, frame indices, edit times, beat/sample alignment |
 | `node studio.mjs render PATH [--preview]` | Render all frames, synthesise audio and export MP4 |
@@ -99,9 +103,13 @@ Technical gates include blank frames, long freeze runs, visual detail and scene-
 ## GitHub workflows
 
 - `.github/workflows/ci.yml`: test and validate on push/PR; no full video render to conserve Actions minutes.
-- `.github/workflows/render.yml`: **manual** Render demo video → QA → upload video and evidence as workflow artifact. Paid vision check requires an `OPENAI_API_KEY` repository secret. Renderer assumes a hosted runner with Chrome and FFmpeg; the workflow fails visibly if these are missing.
+- `.github/workflows/render.yml`: **manual** Render demo video → QA → upload video and evidence as workflow artifact. Paid vision check requires the selected provider API key as a repository secret. Renderer assumes a hosted runner with Chrome and FFmpeg; the workflow fails visibly if these are missing.
 
 If your GitHub Actions minutes are exhausted, CI and hosted renders cannot start until availability is restored; run `npm test` and the studio locally. Files can still be pushed and inspected on GitHub without Actions.
+
+## Claude Code and Codex
+
+The repository includes project-level skills for both coding agents: Claude Code `/motionforge` via `.claude/skills/motionforge/SKILL.md` and Codex `$motionforge` via `.agents/skills/motionforge/SKILL.md`, plus `CLAUDE.md` and `AGENTS.md`. They operate the same CLI locally; no developer API key is needed unless you explicitly ask the studio to call an AI provider. See [providers guide](docs/PROVIDERS.md).
 
 ## Evolve integration
 
@@ -119,6 +127,7 @@ Then in Codex: `Use $evolve to inspect MotionForge, prioritise measured improvem
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — stable components and extension boundaries
 - [docs/PRODUCTION.md](docs/PRODUCTION.md) — shot planning, QA, delivery and practical workflow
+- [docs/PROVIDERS.md](docs/PROVIDERS.md) — Claude, Gemini, Grok and OpenAI integrations, Claude Code and Codex setup
 - [docs/EVOLVE.md](docs/EVOLVE.md) — integration rationale and safe agent guidance
 - [docs/ROADMAP.md](docs/ROADMAP.md) — remaining work, scope and evidence rules
 

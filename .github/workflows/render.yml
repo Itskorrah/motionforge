@@ -3,9 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       vision:
-        description: 'Use paid OpenAI visual critique? Requires OPENAI_API_KEY repository secret.'
+        description: 'Use paid AI visual critique? Requires selected provider repository secret.'
         type: boolean
         default: false
+      critic_provider:
+        description: 'Which AI provider to use for paid visual QA'
+        type: choice
+        options: ['openai', 'claude', 'gemini', 'grok']
+        default: 'openai'
       max_passes:
         description: 'Maximum independent renders (1-3)'
         type: choice
@@ -19,6 +24,9 @@ jobs:
     timeout-minutes: 40
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,11 +42,11 @@ jobs:
         env:
           ENABLE_VISION: ${{ inputs.vision }}
           MAX_PASSES: ${{ inputs.max_passes }}
+          CRITIC_PROVIDER: ${{ inputs.critic_provider }}
         run: |
           ARGS=()
           if [ "$ENABLE_VISION" = 'true' ]; then
-            test -n "$OPENAI_API_KEY" || { echo 'Missing OPENAI_API_KEY GitHub secret'; exit 1; }
-            ARGS+=(--vision)
+            ARGS+=(--vision --critic-provider "$CRITIC_PROVIDER")
           fi
           node studio.mjs produce projects/demo/project.json --preview --max-passes "$MAX_PASSES" --out exports/demo-polished.mp4 --work exports/qa "${ARGS[@]}"
       - name: Upload video and QA evidence

@@ -19,3 +19,10 @@ Run `npm test`, `node studio.mjs plan projects/demo/project.json`, and at least 
 ## Optional Evolve
 
 The project is compatible with `Itskorrah/evolve`, a separate agent skill pack. See `docs/EVOLVE.md`. Do not copy the Evolve repository into the studio. Installed `.agents/skills` and `.evolve` are ignored.
+
+## Multi-provider AI and agent hosts
+
+- `studio/providers.mjs` is the only network boundary for creative planning and visual criticism. Keep providers explicit; never silently cross-send prompts/images to another vendor.
+- The host subscription in Claude Code or Codex is not a substitute for provider API credentials. The studio renderer never needs AI or credentials.
+- Project skills: Codex `$motionforge` at `.agents/skills/motionforge/SKILL.md`, Claude Code `/motionforge` at `.claude/skills/motionforge/SKILL.md`.
+- Mock provider HTTP in tests; never run billable live API calls automatically in CI. Use `docs/PROVIDERS.md` for setup and security guidance.

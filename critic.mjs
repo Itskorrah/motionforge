@@ -2,6 +2,7 @@
  * Network/API access requires an explicit OPENAI_API_KEY. Never fabricates scores.
  */
 import { readFile } from 'node:fs/promises';
+import { generateJSON,providerConfig } from './studio/providers.mjs';
 
 const ISSUE_TYPES=['none','weak_opening','too_static','poor_hierarchy','unreadable_text',
   'collision','cluttered','too_empty','weak_contrast','weak_colour','cut_continuity'];
@@ -10,27 +11,16 @@ const schema={type:'object',additionalProperties:false,required:['score','issues
   critique:{type:'string'}
 }};
 
-export async function critiqueScene({image,model='gpt-4.1-mini',scene,metrics,token=process.env.OPENAI_API_KEY}) {
-  if(!token) throw Error('OPENAI_API_KEY is missing; cannot claim a vision-based 8/10 score');
-  const imageData=(await readFile(image)).toString('base64');
-  const payload={model,store:false,
-    instructions:`You are an uncompromising motion design art director. Examine the actual 2x2 frame storyboard (reading order: top-left opening, top-right early, bottom-left middle, bottom-right near end), and accompanying all-frame diagnostic metrics. Return conservative visual scores 1-10: 8 requires strong hierarchy, legible type, compelling composition, meaningful motion and high production polish; 9+ is exceptional. Never give 8 by default. Empty opening frames, overlap, weak or illegible text, awkward balances and lifeless holds must be penalised. A storyboard alone does not show all animation; rely on diagnostics for dead/frozen intervals. Choose actionable issue types. JSON only.`,
-    input:[{role:'user',content:[{type:'input_text',text:`Evaluate visual scene ${scene+1}. The four images are frame samples at opening, early, middle and near end. These full-sequence objective measurements are factual: ${JSON.stringify(metrics)}. Return your honest visual rating and a concise actionable critique.`},
-      {type:'input_image',image_url:`data:image/png;base64,${imageData}`,detail:'high'}]}],
-    text:{format:{type:'json_schema',name:'scene_review',strict:true,schema}}};
-  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),90000);
-  let response;
-  try {response=await fetch('https://api.openai.com/v1/responses',{
-    method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
-    body:JSON.stringify(payload),signal:controller.signal});} finally{clearTimeout(timeout);}
-  if(!response.ok) throw Error(`Vision API HTTP ${response.status}: ${(await response.text()).slice(0,700)}`);
-  const body=await response.json();
-  const txt=(body.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');
-  if(!txt)throw Error(`Vision API returned no review: ${JSON.stringify(body).slice(0,600)}`);
-  const out=JSON.parse(txt);
-  if(!Number.isInteger(out.score)||out.score<1||out.score>10||!Array.isArray(out.issues)||typeof out.critique!=='string')
-    throw Error('Invalid vision critique, rejecting grade');
-  return {...out,scene,provider:'OpenAI Responses vision',model};
+export async function critiqueScene({image,provider='openai',model,scene,metrics,token,fetchImpl}) {
+  const imageBase64=(await readFile(image)).toString('base64');
+  const system=`You are an uncompromising motion-design art director. Evaluate the 2x2 storyboard in order: top-left opening, top-right early, bottom-left middle, bottom-right near end. Give conservative visual scores from 1 to 10; an 8 requires strong hierarchy, legible type, considered composition, meaningful movement and high polish. Penalise blank openings, weak contrast, overlap, lifeless holds and poor cut continuity. Storyboards alone cannot prove motion quality: use provided frame diagnostics for freezes. Return JSON with integer "score", string array "issues" chosen ONLY from ${ISSUE_TYPES.join(', ')}, and a concise "critique" string. No other fields.`;
+  const user=`Evaluate scene ${scene+1} using the four frame samples and full-frame technical measurements: ${JSON.stringify(metrics)}`;
+  const out=await generateJSON({imageBase64,system,user,provider,model,token,fetchImpl,schema});
+  if(!Number.isInteger(out.score)||out.score<1||out.score>10||
+     !Array.isArray(out.issues)||out.issues.some(x=>!ISSUE_TYPES.includes(x))||
+     typeof out.critique!=='string'||out.critique.length>2000)
+    throw Error('Invalid vision critique; rejecting artistic score');
+  return {score:out.score,issues:out.issues,critique:out.critique,scene,provider,model:model||providerConfig(provider).model};
 }
 
 export function improveTuning(current, scenes) {
