@@ -4,6 +4,16 @@
 
 **Status: functional v0.1 foundation, not a turnkey After Effects replacement.** The working UI is a CLI and editable JSON briefs. An interactive timeline editor, licensed asset ingestion, voiceover, captions, remote rendering, and unlimited autonomous production remain future work. Quality scores are subjective when an AI vision critic is used; local technical scores do not certify aesthetic excellence.
 
+## Use with Codex — copy-and-paste workflows
+
+Open your **target project** in Codex and paste this prompt. It inspects the existing setup, prepares the tools, verifies them and immediately runs a meaningful local workflow.
+
+```text
+Use https://github.com/Itskorrah/motionforge in my current Codex project. Read its current README, AGENTS instructions and prompts/codex/setup-and-run.md, check Git status, and preserve existing project changes. Use a reviewed MotionForge checkout, read `AGENTS.md`, `docs/PROVIDERS.md` and the `$motionforge` skill entry point if this host supports it. Verify the required Node.js, Chrome/Chromium and FFmpeg tools, then run `npm test`, plan the bundled `projects/demo/project.json` with `node studio.mjs plan`, and render a short offline preview using the documented CLI. Inspect actual generated frames, audio sync, playback and QA outputs. If the user provided a creative brief, initialise and produce a bounded original project with an improved critique/iteration cycle; otherwise execute and verify the offline demo and ask for the creative brief to proceed. Preserve physically modelled springs, exact frame/sample alignment, untrusted input controls and raw renderer compatibility. No paid model-provider calls without explicit user permission and configured credentials; Codex/Claude subscriptions are not API keys. Subjective scores do not certify aesthetic quality. Run local verification; for approved scoped code changes, commit, push, create a PR and merge where permitted without bypassing branch protection. Do not depend on GitHub Actions. Report evidence, unsupported features and blockers.
+```
+
+More copyable Codex workflows: [complete setup and execution](prompts/codex/setup-and-run.md) · [update](prompts/codex/update.md) · [resume](prompts/codex/resume.md) · [extended autonomous](prompts/codex/autonomous.md).
+
 ## Five-minute start
 
 Requirements: **Node.js 22+**, **Chrome or Chromium**, **FFmpeg** (and optionally Python 3.10+ to install [Evolve](https://github.com/Itskorrah/evolve)). There are **no npm runtime dependencies** or paid services required to render.
